@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Castle Fight</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: sans-serif;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        #top-ui {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .ui-panel {
+            color: white;
+            font-size: 20px;
+            background-color: rgba(0, 0, 0, 0.5);
+            padding: 10px;
+            border-radius: 10px;
+            text-shadow: 1px 1px 2px black;
+        }
+
+        #enemy-base-units {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            color: red;
+            font-size: 20px;
+            background-color: rgba(0, 0, 0, 0.5);
+            padding: 10px;
+            border-radius: 10px;
+            text-shadow: 1px 1px 2px black;
+        }
+
+        #menu {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(0, 0, 0, 0.5);
+            padding: 10px;
+            border-radius: 10px;
+            display: flex;
+            gap: 10px;
+        }
+
+        .menu-button {
+            padding: 10px 20px;
+            background-color: #444;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .menu-button:hover {
+            background-color: #666;
+        }
+
+        .cost-label {
+            font-size: 12px;
+            margin-top: 5px;
+            color: gold;
+        }
+
+        .menu-button.disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        #win-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            font-size: 48px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            text-align: center;
+            z-index: 1000;
+            display: none;
+        }
+
+        #win-screen button {
+            padding: 15px 30px;
+            font-size: 24px;
+            margin-top: 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        #win-screen button:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="top-ui">
+        <div id="gold-display" class="ui-panel">Золото: 1000</div>
+        <div id="unit-count" class="ui-panel">Юніти на карті: 0</div>
+    </div>
+    <div id="enemy-base-units" class="ui-panel">Юнітів на базі ворога: 0 / 25</div>
+
+    <div id="menu">
+        <button class="menu-button" id="build-castle">
+            <img src="castle_icon.png" alt="Замок" style="width: 50px; height: 50px;">
+            <span class="cost-label">400</span>
+        </button>
+        <button class="menu-button" id="build-tower">
+            <img src="tower_icon.png" alt="Вежа" style="width: 50px; height: 50px;">
+            <span class="cost-label">200</span>
+        </button>
+    </div>
+
+    <div id="win-screen">
+        <p>Ви перемогли!</p>
+        <button id="restart-button">Перезапустити гру</button>
+    </div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.165.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.165.0/examples/jsm/"
+            }
+        }
+    </script>
+    <script type="module" src="main.js"></script>
+</body>
+
+</html>
