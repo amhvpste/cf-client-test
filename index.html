@@ -32,17 +32,24 @@
             text-shadow: 1px 1px 2px black;
         }
 
-        #enemy-health-container {
+        .health-container {
             position: absolute;
             top: 20px;
-            right: 20px;
             background-color: rgba(0, 0, 0, 0.5);
             padding: 10px;
             border-radius: 10px;
             min-width: 200px;
+            color: white;
+            text-align: center;
+            font-weight: bold;
+            text-shadow: 1px 1px 2px black;
         }
 
-        #enemy-health-bar {
+        .health-container div:first-child {
+            margin-bottom: 5px;
+        }
+
+        .health-bar {
             height: 24px;
             background-color: #ff3333;
             border-radius: 4px;
@@ -53,6 +60,10 @@
             text-shadow: 1px 1px 2px black;
             transition: width 0.3s;
             width: 100%;
+        }
+
+        #player-health-bar {
+            background-color: #33cc33;
         }
 
         #menu {
@@ -131,12 +142,17 @@
 </head>
 
 <body>
-    <div id="top-ui" style="display: flex; flex-direction: column; gap: 10px; padding: 10px;">
-        <div id="gold-display" class="ui-panel" style="margin: 0; padding: 8px 15px; font-size: 18px;">Gold: 1000</div>
-        <div id="unit-count" class="ui-panel" style="margin: 0; padding: 8px 15px; font-size: 18px;">Units: 0</div>
+    <div id="top-ui" class="ui-panel" style="position: absolute; left: 50%; transform: translateX(-50%); top: 20px; padding: 8px 15px; font-size: 18px;">
+        Gold: 1000
     </div>
-    <div id="enemy-health-container">
-        <div id="enemy-health-bar">100/100</div>
+    
+    <div id="player-health-container" class="health-container" style="left: 20px;">
+        <div>Base Health</div>
+        <div id="player-health-bar" class="health-bar">100/100</div>
+    </div>
+    <div id="enemy-health-container" class="health-container" style="right: 20px;">
+        <div>Enemy Base</div>
+        <div id="enemy-health-bar" class="health-bar">100/100</div>
     </div>
 
     <div id="menu">

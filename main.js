@@ -47,13 +47,17 @@ const buildingUnitTypes = {
 
 const buildings = [];
 const units = [];
+const enemyUnits = [];
+let lastEnemySpawnTime = 0;
+const ENEMY_SPAWN_COOLDOWN = 10000; // 10 seconds
 
 const MAP_WIDTH = 20;
 const PLAYER_SIDE_Z_MAX = 0;
 const PLAYER_BASE_TARGET = new THREE.Vector3(0, 0, -MAP_WIDTH / 3);
 const ENEMY_BASE_TARGET = new THREE.Vector3(0, 0, MAP_WIDTH / 3);
-const ENEMY_BASE_MAX_HEALTH = 100;
-let enemyBaseHealth = ENEMY_BASE_MAX_HEALTH;
+const BASE_MAX_HEALTH = 100;
+let enemyBaseHealth = BASE_MAX_HEALTH;
+let playerBaseHealth = BASE_MAX_HEALTH;
 const ATTACK_RADIUS = 2; // How close units get to the base
 
 const CASTLE_UNIT_COOLDOWN = 5000;
@@ -63,19 +67,22 @@ const loader = new GLTFLoader();
 
 // Початок області видимості глобальних функцій
 function updateGoldDisplay() {
-    document.getElementById('gold-display').innerText = `gold: ${gold}`;
+    document.getElementById('top-ui').innerText = `Gold: ${gold}`;
     checkButtonAvailability();
-}
-
-function updateUnitCount() {
-    document.getElementById('unit-count').innerText = `units: ${units.length}`;
 }
 
 function updateEnemyBaseHealth() {
     const healthBar = document.getElementById('enemy-health-bar');
-    const healthPercent = (enemyBaseHealth / ENEMY_BASE_MAX_HEALTH) * 100;
+    const healthPercent = (enemyBaseHealth / BASE_MAX_HEALTH) * 100;
     healthBar.style.width = `${healthPercent}%`;
-    healthBar.textContent = `${enemyBaseHealth}/${ENEMY_BASE_MAX_HEALTH}`;
+    healthBar.textContent = `${enemyBaseHealth}/${BASE_MAX_HEALTH}`;
+}
+
+function updatePlayerBaseHealth() {
+    const healthBar = document.getElementById('player-health-bar');
+    const healthPercent = (playerBaseHealth / BASE_MAX_HEALTH) * 100;
+    healthBar.style.width = `${healthPercent}%`;
+    healthBar.textContent = `${playerBaseHealth}/${BASE_MAX_HEALTH}`;
 }
 
 function checkButtonAvailability() {
@@ -142,21 +149,119 @@ function spawnUnit(building) {
 }
 
 function checkWinCondition() {
-    if (enemyBaseHealth <= 0 && !gameWon) {
-        gameWon = true;
+    if (enemyBaseHealth <= 0) {
+        document.getElementById('win-screen').querySelector('p').textContent = 'You Win!';
         document.getElementById('win-screen').style.display = 'flex';
+        return true;
+    } else if (playerBaseHealth <= 0) {
+        document.getElementById('win-screen').querySelector('p').textContent = 'Game Over!';
+        document.getElementById('win-screen').style.display = 'flex';
+        return true;
+    }
+    return false;
+}
+
+function spawnEnemyUnit() {
+    if (!enemyUnits.length || Math.random() < 0.3) { // 30% chance to spawn a ram, 70% for ballista
+        const unitType = Math.random() < 0.5 ? UNIT_TYPES.RAM : UNIT_TYPES.BALLISTA;
+        const unitProps = UNIT_PROPERTIES[unitType];
+        
+        if (!unitProps || !unitProps.modelInstance) return;
+        
+        const newUnit = unitProps.modelInstance.clone();
+        const spawnX = (Math.random() - 0.5) * 10; // Random x position near the enemy base
+        newUnit.position.set(spawnX, 0, MAP_WIDTH / 3);
+        newUnit.unitType = unitType;
+        newUnit.speed = unitProps.speed * 0.8; // Slightly slower than player units
+        newUnit.damage = unitProps.damage;
+        newUnit.target = PLAYER_BASE_TARGET.clone();
+        newUnit.isAttacking = false;
+        newUnit.attackCooldown = 0;
+        newUnit.attackPosition = null;
+        
+        scene.add(newUnit);
+        enemyUnits.push(newUnit);
+    }
+}
+
+function updateEnemyUnits(delta) {
+    for (let i = enemyUnits.length - 1; i >= 0; i--) {
+        const unit = enemyUnits[i];
+        const distance = unit.position.distanceTo(unit.target);
+
+        if (distance > 0.5) {
+            const direction = new THREE.Vector3().subVectors(unit.target, unit.position).normalize();
+            unit.position.add(direction.multiplyScalar(unit.speed));
+            
+            // Check if unit reached player base
+            if (!unit.isAttacking && unit.position.distanceTo(PLAYER_BASE_TARGET) < ATTACK_RADIUS + 1) {
+                unit.isAttacking = true;
+                // Find a position around the player base for this unit
+                const angle = (enemyUnits.filter(u => u.isAttacking).length / 8) * Math.PI * 2;
+                unit.attackPosition = new THREE.Vector3(
+                    PLAYER_BASE_TARGET.x + Math.cos(angle) * ATTACK_RADIUS,
+                    0,
+                    PLAYER_BASE_TARGET.z + Math.sin(angle) * ATTACK_RADIUS
+                );
+            }
+            
+            if (unit.isAttacking) {
+                // If we have an attack position, move to it
+                if (unit.attackPosition) {
+                    const direction = new THREE.Vector3().subVectors(unit.attackPosition, unit.position);
+                    if (direction.length() > 0.1) {
+                        direction.normalize();
+                        unit.position.add(direction.multiplyScalar(0.05));
+                    }
+                }
+                
+                // Deal damage every second
+                unit.attackCooldown -= delta * 1000; // Convert delta to milliseconds
+                if (unit.attackCooldown <= 0) {
+                    playerBaseHealth = Math.max(0, playerBaseHealth - unit.damage);
+                    updatePlayerBaseHealth();
+                    unit.attackCooldown = 1000; // 1 second cooldown
+                    
+                    // Check if player base is destroyed
+                    if (playerBaseHealth <= 0) {
+                        checkWinCondition();
+                        // Remove all units when base is destroyed
+                        scene.remove(unit);
+                        enemyUnits.splice(i, 1);
+                        continue;
+                    }
+                }
+            }
+        }
+        
+        // Rotate unit to face movement direction
+        if (unit.target) {
+            unit.lookAt(unit.target);
+        }
     }
 }
 
 function restartGame() {
-    // Remove all decorative objects
-    decorativeObjects.forEach(obj => {
-        scene.remove(obj);
-    });
-    decorativeObjects = [];
+    // Reset game state
+    enemyBaseHealth = BASE_MAX_HEALTH;
+    playerBaseHealth = BASE_MAX_HEALTH;
+    updateEnemyBaseHealth();
+    updatePlayerBaseHealth();
+    gold = 1000;
+    updateGoldDisplay();
     
-    // Reload the page
-    window.location.reload();
+    // Clear existing units and buildings
+    units.length = 0;
+    buildings.length = 0;
+    enemyUnits.length = 0;
+    updateUnitCount();
+    
+    // Hide win screen
+    document.getElementById('win-screen').style.display = 'none';
+    gameWon = false;
+    
+    // Reset spawn timers
+    lastEnemySpawnTime = 0;
 }
 
 // Add these variables at the top with other global variables
@@ -714,7 +819,7 @@ function init() {
     loadDecorativeModels();
     
     updateGoldDisplay();
-    updateUnitCount();
+    updatePlayerBaseHealth();
     updateEnemyBaseHealth();
     
     // Create decorative elements
@@ -740,6 +845,16 @@ function animate() {
         renderer.render(scene, camera);
         return;
     }
+
+    // Spawn enemy units periodically
+    const currentTime = Date.now();
+    if (currentTime - lastEnemySpawnTime > ENEMY_SPAWN_COOLDOWN) {
+        spawnEnemyUnit();
+        lastEnemySpawnTime = currentTime;
+    }
+    
+    // Update enemy units
+    updateEnemyUnits(delta);
 
     const newCameraPosition = worker.position.clone().add(cameraOffset);
     camera.position.lerp(newCameraPosition, 0.05);
@@ -772,7 +887,7 @@ function animate() {
         }
     }
 
-    const currentTime = Date.now();
+    // Use the already defined currentTime variable
     for (const building of buildings) {
         const cooldown = (building.type === 'castle') ? CASTLE_UNIT_COOLDOWN : TOWER_UNIT_COOLDOWN;
         if (currentTime - building.lastSpawnTime > cooldown) {
