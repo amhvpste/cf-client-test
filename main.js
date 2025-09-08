@@ -25,7 +25,8 @@ const ENEMY_BASE_TARGET = new THREE.Vector3(0, 0, MAP_WIDTH / 4);
 const PLAYER_BASE_TARGET = new THREE.Vector3(0, 0, -MAP_WIDTH / 4);
 const ENEMY_BASE_MAX_HEALTH = 100;
 let enemyBaseHealth = ENEMY_BASE_MAX_HEALTH;
-const UNIT_DAMAGE = 5;
+const UNIT_DAMAGE = 2; // Damage per second per unit
+const ATTACK_RADIUS = 2; // How close units get to the base
 
 const CASTLE_UNIT_COOLDOWN = 5000;
 const TOWER_UNIT_COOLDOWN = 10000;
@@ -84,7 +85,9 @@ function spawnUnit(building) {
     const newUnit = unitModel.clone();
     newUnit.position.copy(building.object.position);
     newUnit.target = ENEMY_BASE_TARGET.clone();
-    newUnit.hasAttacked = false;
+    newUnit.isAttacking = false;
+    newUnit.attackCooldown = 0;
+    newUnit.attackPosition = null; // Will be set when the unit reaches the base
     scene.add(newUnit);
     units.push(newUnit);
     updateUnitCount();
@@ -256,7 +259,10 @@ function onWindowResize() {
     renderer.setSize(window.innerWidth, window.innerHeight);
 }
 
+let clock = new THREE.Clock();
+
 function animate() {
+    const delta = clock.getDelta();
     requestAnimationFrame(animate);
 
     if (gameWon) {
@@ -310,16 +316,45 @@ function animate() {
             const direction = new THREE.Vector3().subVectors(unit.target, unit.position).normalize();
             unit.position.add(direction.multiplyScalar(0.05));
             // Check if unit reached enemy base
-            if (unit.position.distanceTo(ENEMY_BASE_TARGET) < 2 && !unit.hasAttacked) {
-                unit.hasAttacked = true;
-                enemyBaseHealth = Math.max(0, enemyBaseHealth - UNIT_DAMAGE);
-                updateEnemyBaseHealth();
-                scene.remove(unit);
-                const index = units.indexOf(unit);
-                if (index > -1) {
-                    units.splice(index, 1);
+            if (!unit.isAttacking && unit.position.distanceTo(ENEMY_BASE_TARGET) < ATTACK_RADIUS + 1) {
+                unit.isAttacking = true;
+                // Find a position around the base for this unit
+                const angle = (units.filter(u => u.isAttacking).length / 8) * Math.PI * 2; // Spread units in a circle
+                unit.attackPosition = new THREE.Vector3(
+                    ENEMY_BASE_TARGET.x + Math.cos(angle) * ATTACK_RADIUS,
+                    0,
+                    ENEMY_BASE_TARGET.z + Math.sin(angle) * ATTACK_RADIUS
+                );
+            }
+            
+            if (unit.isAttacking) {
+                // If we have an attack position, move to it
+                if (unit.attackPosition) {
+                    const direction = new THREE.Vector3().subVectors(unit.attackPosition, unit.position);
+                    if (direction.length() > 0.1) {
+                        direction.normalize();
+                        unit.position.add(direction.multiplyScalar(0.05));
+                    }
                 }
-                checkWinCondition();
+                
+                // Deal damage every second
+                unit.attackCooldown -= delta * 1000; // Convert delta to milliseconds
+                if (unit.attackCooldown <= 0) {
+                    enemyBaseHealth = Math.max(0, enemyBaseHealth - UNIT_DAMAGE);
+                    updateEnemyBaseHealth();
+                    unit.attackCooldown = 1000; // 1 second cooldown
+                    
+                    // Check if base is destroyed
+                    if (enemyBaseHealth <= 0) {
+                        checkWinCondition();
+                        // Remove all units when base is destroyed
+                        scene.remove(unit);
+                        const index = units.indexOf(unit);
+                        if (index > -1) {
+                            units.splice(index, 1);
+                        }
+                    }
+                }
             }
         }
     }
