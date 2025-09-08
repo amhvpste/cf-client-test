@@ -561,32 +561,32 @@ function loadModels() {
         );
         
                 // Load other models
-        loader.load('assets/models/castle_fort_01.glb', 
+        loader.load('assets/models/tower-slant-roof.glb', 
             (gltf) => handleLoad(gltf, 'castle'), 
             undefined, 
             (error) => {
-                console.error('Error loading castle_fort_01.glb:', error);
+                console.error('Error loading tower-slant-roof.glb:', error);
                 // Even if loading fails, we need to continue
                 loadedCount++;
                 if (loadedCount >= totalModels) resolve();
             }
         );
         
-        loader.load('assets/models/tower1.glb', 
+        loader.load('assets/models/tower-square-roof.glb', 
             (gltf) => handleLoad(gltf, 'tower'), 
             undefined, 
             (error) => {
-                console.error('Error loading tower1.glb:', error);
+                console.error('Error loading tower-square-roof.glb:', error);
                 loadedCount++;
                 if (loadedCount >= totalModels) resolve();
             }
         );
         
-        loader.load('assets/models/castle_gate_01.glb', 
+        loader.load('assets/models/bridge-straight.glb', 
             (gltf) => handleLoad(gltf, 'gate'), 
             undefined, 
             (error) => {
-                console.error('Error loading castle_gate_01.glb:', error);
+                console.error('Error loading bridge-straight.glb:', error);
                 loadedCount++;
                 if (loadedCount >= totalModels) resolve();
             }
