@@ -32,16 +32,27 @@
             text-shadow: 1px 1px 2px black;
         }
 
-        #enemy-base-units {
+        #enemy-health-container {
             position: absolute;
             top: 20px;
             right: 20px;
-            color: red;
-            font-size: 20px;
             background-color: rgba(0, 0, 0, 0.5);
             padding: 10px;
             border-radius: 10px;
+            min-width: 200px;
+        }
+
+        #enemy-health-bar {
+            height: 24px;
+            background-color: #ff3333;
+            border-radius: 4px;
+            color: white;
+            text-align: center;
+            line-height: 24px;
+            font-weight: bold;
             text-shadow: 1px 1px 2px black;
+            transition: width 0.3s;
+            width: 100%;
         }
 
         #menu {
@@ -124,7 +135,9 @@
         <div id="gold-display" class="ui-panel">gold: 1000</div>
         <div id="unit-count" class="ui-panel">units for map : 0</div>
     </div>
-    <div id="enemy-base-units" class="ui-panel">units for enemy base: 0 / 25</div>
+    <div id="enemy-health-container">
+        <div id="enemy-health-bar">100/100</div>
+    </div>
 
     <div id="menu">
         <button class="menu-button" id="build-castle">

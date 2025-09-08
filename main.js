@@ -23,8 +23,9 @@ const MAP_WIDTH = 20;
 const PLAYER_SIDE_Z_MAX = 0;
 const ENEMY_BASE_TARGET = new THREE.Vector3(0, 0, MAP_WIDTH / 4);
 const PLAYER_BASE_TARGET = new THREE.Vector3(0, 0, -MAP_WIDTH / 4);
-let unitsAtEnemyBase = 0;
-const WIN_CONDITION_UNITS = 25;
+const ENEMY_BASE_MAX_HEALTH = 100;
+let enemyBaseHealth = ENEMY_BASE_MAX_HEALTH;
+const UNIT_DAMAGE = 5;
 
 const CASTLE_UNIT_COOLDOWN = 5000;
 const TOWER_UNIT_COOLDOWN = 10000;
@@ -41,8 +42,11 @@ function updateUnitCount() {
     document.getElementById('unit-count').innerText = `units on map: ${units.length}`;
 }
 
-function updateEnemyBaseUnits() {
-    document.getElementById('enemy-base-units').innerText = `unit for enemy base : ${unitsAtEnemyBase} / ${WIN_CONDITION_UNITS}`;
+function updateEnemyBaseHealth() {
+    const healthBar = document.getElementById('enemy-health-bar');
+    const healthPercent = (enemyBaseHealth / ENEMY_BASE_MAX_HEALTH) * 100;
+    healthBar.style.width = `${healthPercent}%`;
+    healthBar.textContent = `${enemyBaseHealth}/${ENEMY_BASE_MAX_HEALTH}`;
 }
 
 function checkButtonAvailability() {
@@ -80,13 +84,14 @@ function spawnUnit(building) {
     const newUnit = unitModel.clone();
     newUnit.position.copy(building.object.position);
     newUnit.target = ENEMY_BASE_TARGET.clone();
+    newUnit.hasAttacked = false;
     scene.add(newUnit);
     units.push(newUnit);
     updateUnitCount();
 }
 
 function checkWinCondition() {
-    if (unitsAtEnemyBase >= WIN_CONDITION_UNITS && !gameWon) {
+    if (enemyBaseHealth <= 0 && !gameWon) {
         gameWon = true;
         document.getElementById('win-screen').style.display = 'flex';
     }
@@ -239,7 +244,7 @@ function init() {
 
     updateGoldDisplay();
     updateUnitCount();
-    updateEnemyBaseUnits();
+    updateEnemyBaseHealth();
 
     window.addEventListener('click', onMouseClick, false);
     window.addEventListener('resize', onWindowResize, false);
@@ -304,14 +309,18 @@ function animate() {
         if (distance > 0.5) {
             const direction = new THREE.Vector3().subVectors(unit.target, unit.position).normalize();
             unit.position.add(direction.multiplyScalar(0.05));
-            unit.lookAt(unit.target.x, unit.position.y, unit.target.z);
-        } else {
-            unitsAtEnemyBase++;
-            updateEnemyBaseUnits();
-            scene.remove(unit);
-            units.splice(i, 1);
-            updateUnitCount();
-            checkWinCondition();
+            // Check if unit reached enemy base
+            if (unit.position.distanceTo(ENEMY_BASE_TARGET) < 2 && !unit.hasAttacked) {
+                unit.hasAttacked = true;
+                enemyBaseHealth = Math.max(0, enemyBaseHealth - UNIT_DAMAGE);
+                updateEnemyBaseHealth();
+                scene.remove(unit);
+                const index = units.indexOf(unit);
+                if (index > -1) {
+                    units.splice(index, 1);
+                }
+                checkWinCondition();
+            }
         }
     }
 
