@@ -11,9 +11,35 @@ let currentBuildingModel;
 const cameraOffset = new THREE.Vector3(0, 5, -5);
 
 let gold = 1000;
+const UNIT_TYPES = {
+    RAM: 'ram',
+    BALLISTA: 'ballista'
+};
+
+// Initialize unit properties with null model instances
+const UNIT_PROPERTIES = {
+    [UNIT_TYPES.RAM]: {
+        damage: 2,
+        model: 'ram',
+        modelInstance: null,  // Will be set when model loads
+        speed: 0.05
+    },
+    [UNIT_TYPES.BALLISTA]: {
+        damage: 10,
+        model: 'ballista',
+        modelInstance: null,  // Will be set when model loads
+        speed: 0.03
+    }
+};
+
 const buildingCosts = {
     castle: 400,
     tower: 200
+};
+
+const buildingUnitTypes = {
+    castle: UNIT_TYPES.BALLISTA,
+    tower: UNIT_TYPES.RAM
 };
 
 const buildings = [];
@@ -25,7 +51,6 @@ const ENEMY_BASE_TARGET = new THREE.Vector3(0, 0, MAP_WIDTH / 4);
 const PLAYER_BASE_TARGET = new THREE.Vector3(0, 0, -MAP_WIDTH / 4);
 const ENEMY_BASE_MAX_HEALTH = 100;
 let enemyBaseHealth = ENEMY_BASE_MAX_HEALTH;
-const UNIT_DAMAGE = 2; // Damage per second per unit
 const ATTACK_RADIUS = 2; // How close units get to the base
 
 const CASTLE_UNIT_COOLDOWN = 5000;
@@ -40,7 +65,7 @@ function updateGoldDisplay() {
 }
 
 function updateUnitCount() {
-    document.getElementById('unit-count').innerText = `units on map: ${units.length}`;
+    document.getElementById('unit-count').innerText = `units: ${units.length}`;
 }
 
 function updateEnemyBaseHealth() {
@@ -81,16 +106,36 @@ function getSelectedBuildingType() {
 function spawnUnit(building) {
     if (gameWon) return;
     
-    console.log(`Спавн юніта з будівлі типу: ${building.type}.`);
-    const newUnit = unitModel.clone();
-    newUnit.position.copy(building.object.position);
-    newUnit.target = ENEMY_BASE_TARGET.clone();
-    newUnit.isAttacking = false;
-    newUnit.attackCooldown = 0;
-    newUnit.attackPosition = null; // Will be set when the unit reaches the base
-    scene.add(newUnit);
-    units.push(newUnit);
-    updateUnitCount();
+    const unitType = buildingUnitTypes[building.type];
+    const unitProps = UNIT_PROPERTIES[unitType];
+    
+    // Check if the model is loaded
+    if (!unitProps || !unitProps.modelInstance) {
+        console.error(`Cannot spawn unit: Model not loaded for unit type ${unitType}`);
+        return;
+    }
+    
+    console.log(`Spawning ${unitType} unit from ${building.type} building.`);
+    
+    try {
+        const newUnit = unitProps.modelInstance.clone();
+        newUnit.position.copy(building.object.position);
+        newUnit.unitType = unitType;
+        newUnit.speed = unitProps.speed;
+        newUnit.damage = unitProps.damage;
+        newUnit.target = ENEMY_BASE_TARGET.clone();
+        newUnit.isAttacking = false;
+        newUnit.attackCooldown = 0;
+        newUnit.attackPosition = null;
+        
+        scene.add(newUnit);
+        units.push(newUnit);
+        updateUnitCount();
+        
+        console.log(`Successfully spawned ${unitType} at`, newUnit.position);
+    } catch (error) {
+        console.error('Error spawning unit:', error);
+    }
 }
 
 function checkWinCondition() {
@@ -191,11 +236,11 @@ function createModelViewer(model, containerId, size = 1, rotation = { x: 0, y: 0
 function loadModels() {
     return new Promise((resolve) => {
         let loadedCount = 0;
-        const totalModels = 6;
+        const totalModels = 7; // Updated to include the wall model
 
         const handleLoad = (gltf, modelType) => {
-            console.log(`Модель '${modelType}' успішно завантажена.`);
             const model = gltf.scene;
+            // Scale model to fit in the scene
             const box = new THREE.Box3().setFromObject(model);
             const size = box.getSize(new THREE.Vector3());
             const maxDimension = Math.max(size.x, size.y, size.z);
@@ -206,9 +251,12 @@ function loadModels() {
             if (modelType === 'worker') {
                 workerModel = model;
                 workerModel.rotation.y = Math.PI / 2;
-            } else if (modelType === 'unit') {
-                unitModel = model;
-                unitModel.rotation.y = Math.PI / 2;
+            } else if (modelType === 'ram') {
+                UNIT_PROPERTIES[UNIT_TYPES.RAM].modelInstance = model;
+                model.rotation.y = Math.PI / 2;
+            } else if (modelType === 'ballista') {
+                UNIT_PROPERTIES[UNIT_TYPES.BALLISTA].modelInstance = model;
+                model.rotation.y = Math.PI / 2;
             } else if (modelType === 'castle') {
                 castleModel = model;
             } else if (modelType === 'tower') {
@@ -219,17 +267,125 @@ function loadModels() {
 
             loadedCount++;
             if (loadedCount === totalModels) {
-                console.log("Усі моделі завантажено!");
+                console.log("All models loaded successfully!");
                 resolve();
             }
         };
 
-        loader.load('worker2.glb', (gltf) => handleLoad(gltf, 'worker'), undefined, (error) => console.error('Помилка завантаження worker2.glb', error));
-        loader.load('test-unit.glb', (gltf) => handleLoad(gltf, 'unit'), undefined, (error) => console.error('Помилка завантаження test-unit.glb', error));
-        loader.load('castle_fort_01.glb', (gltf) => handleLoad(gltf, 'castle'), undefined, (error) => console.error('Помилка завантаження castle_fort_01.glb', error));
-        loader.load('tower1.glb', (gltf) => handleLoad(gltf, 'tower'), undefined, (error) => console.error('Помилка завантаження tower1.glb', error));
-        loader.load('castle_gate_01.glb', (gltf) => handleLoad(gltf, 'gate'), undefined, (error) => console.error('Помилка завантаження castle_gate_01.glb', error));
-        loader.load('wall_01.glb', (gltf) => handleLoad(gltf, 'wall'), undefined, (error) => console.error('Помилка завантаження wall_01.glb', error));
+        // Load worker model
+        loader.load('worker2.glb', 
+            (gltf) => handleLoad(gltf, 'worker'), 
+            undefined, 
+            (error) => {
+                console.error('Error loading worker2.glb:', error);
+                loadedCount++;
+                if (loadedCount >= totalModels) resolve();
+            }
+        );
+        
+        // Load siege ram model
+        loader.load('models/GLB format/siege-ram.glb', 
+            (gltf) => {
+                try {
+                    const model = gltf.scene;
+                    // Scale model to fit in the scene
+                    const box = new THREE.Box3().setFromObject(model);
+                    const size = box.getSize(new THREE.Vector3());
+                    const maxDimension = Math.max(size.x, size.y, size.z);
+                    const scaleFactor = 1.5 / maxDimension;
+                    model.scale.multiplyScalar(scaleFactor);
+                    model.rotation.y = Math.PI / 2;
+                    
+                    // Assign to unit properties
+                    UNIT_PROPERTIES[UNIT_TYPES.RAM].modelInstance = model;
+                    console.log('Siege ram model loaded successfully');
+                } catch (error) {
+                    console.error('Error processing siege ram model:', error);
+                } finally {
+                    loadedCount++;
+                    if (loadedCount >= totalModels) resolve();
+                }
+            },
+            undefined,
+            (error) => {
+                console.error('Error loading siege-ram.glb:', error);
+                loadedCount++;
+                if (loadedCount >= totalModels) resolve();
+            }
+        );
+        
+        // Load siege ballista model
+        loader.load('models/GLB format/siege-ballista.glb', 
+            (gltf) => {
+                try {
+                    const model = gltf.scene;
+                    // Scale model to fit in the scene
+                    const box = new THREE.Box3().setFromObject(model);
+                    const size = box.getSize(new THREE.Vector3());
+                    const maxDimension = Math.max(size.x, size.y, size.z);
+                    const scaleFactor = 1.5 / maxDimension;
+                    model.scale.multiplyScalar(scaleFactor);
+                    model.rotation.y = Math.PI / 2;
+                    
+                    // Assign to unit properties
+                    UNIT_PROPERTIES[UNIT_TYPES.BALLISTA].modelInstance = model;
+                    console.log('Siege ballista model loaded successfully');
+                } catch (error) {
+                    console.error('Error processing siege ballista model:', error);
+                } finally {
+                    loadedCount++;
+                    if (loadedCount >= totalModels) resolve();
+                }
+            },
+            undefined,
+            (error) => {
+                console.error('Error loading siege-ballista.glb:', error);
+                loadedCount++;
+                if (loadedCount >= totalModels) resolve();
+            }
+        );
+        
+                // Load other models
+        loader.load('castle_fort_01.glb', 
+            (gltf) => handleLoad(gltf, 'castle'), 
+            undefined, 
+            (error) => {
+                console.error('Error loading castle_fort_01.glb:', error);
+                // Even if loading fails, we need to continue
+                loadedCount++;
+                if (loadedCount >= totalModels) resolve();
+            }
+        );
+        
+        loader.load('tower1.glb', 
+            (gltf) => handleLoad(gltf, 'tower'), 
+            undefined, 
+            (error) => {
+                console.error('Error loading tower1.glb:', error);
+                loadedCount++;
+                if (loadedCount >= totalModels) resolve();
+            }
+        );
+        
+        loader.load('castle_gate_01.glb', 
+            (gltf) => handleLoad(gltf, 'gate'), 
+            undefined, 
+            (error) => {
+                console.error('Error loading castle_gate_01.glb:', error);
+                loadedCount++;
+                if (loadedCount >= totalModels) resolve();
+            }
+        );
+        
+        loader.load('wall_01.glb', 
+            (gltf) => handleLoad(gltf, 'wall'), 
+            undefined, 
+            (error) => {
+                console.error('Error loading wall_01.glb:', error);
+                loadedCount++;
+                if (loadedCount >= totalModels) resolve();
+            }
+        );
     });
 }
 
@@ -378,17 +534,20 @@ function animate() {
             const direction = new THREE.Vector3().subVectors(targetPosition, worker.position).normalize();
             worker.position.add(direction.multiplyScalar(0.05));
         } else {
-            const building = currentBuildingModel.clone();
-            building.position.copy(targetPosition);
-            
             const buildingType = getSelectedBuildingType();
+            const building = {
+                object: currentBuildingModel.clone(),
+                type: buildingType,
+                lastSpawnTime: 0,
+                spawnCooldown: buildingType === 'castle' ? CASTLE_UNIT_COOLDOWN : TOWER_UNIT_COOLDOWN,
+                unitType: buildingUnitTypes[buildingType]
+            };
             
-            buildings.push({
-                object: building,
-                lastSpawnTime: Date.now(),
-                type: buildingType
-            });
-            scene.add(building);
+            building.object.position.copy(targetPosition);
+            buildings.push(building);
+            scene.add(building.object);
+            
+            console.log(`Placed ${buildingType} building that will spawn ${building.unitType} units`);
             targetPosition = null;
         }
     }
@@ -409,7 +568,7 @@ function animate() {
 
         if (distance > 0.5) {
             const direction = new THREE.Vector3().subVectors(unit.target, unit.position).normalize();
-            unit.position.add(direction.multiplyScalar(0.05));
+            unit.position.add(direction.multiplyScalar(unit.speed));
             // Check if unit reached enemy base
             if (!unit.isAttacking && unit.position.distanceTo(ENEMY_BASE_TARGET) < ATTACK_RADIUS + 1) {
                 unit.isAttacking = true;
@@ -435,7 +594,7 @@ function animate() {
                 // Deal damage every second
                 unit.attackCooldown -= delta * 1000; // Convert delta to milliseconds
                 if (unit.attackCooldown <= 0) {
-                    enemyBaseHealth = Math.max(0, enemyBaseHealth - UNIT_DAMAGE);
+                    enemyBaseHealth = Math.max(0, enemyBaseHealth - unit.damage);
                     updateEnemyBaseHealth();
                     unit.attackCooldown = 1000; // 1 second cooldown
                     
@@ -457,7 +616,22 @@ function animate() {
     renderer.render(scene, camera);
 }
 
+// Start loading models and then initialize the game
 loadModels().then(() => {
+    console.log('All models loaded, initializing game...');
+    console.log('Worker model:', workerModel ? 'Loaded' : 'Missing');
+    console.log('Castle model:', castleModel ? 'Loaded' : 'Missing');
+    console.log('Tower model:', towerModel ? 'Loaded' : 'Missing');
+    console.log('Gate model:', gateModel ? 'Loaded' : 'Missing');
+    
+    // Verify all required models are loaded
+    if (!workerModel || !castleModel || !towerModel || !gateModel) {
+        console.error('Error: Some models failed to load. Please check the console for errors.');
+        return;
+    }
+    
     init();
     animate();
+}).catch(error => {
+    console.error('Error loading models:', error);
 });
