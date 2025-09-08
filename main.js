@@ -50,8 +50,8 @@ const units = [];
 
 const MAP_WIDTH = 20;
 const PLAYER_SIDE_Z_MAX = 0;
-const ENEMY_BASE_TARGET = new THREE.Vector3(0, 0, MAP_WIDTH / 4);
-const PLAYER_BASE_TARGET = new THREE.Vector3(0, 0, -MAP_WIDTH / 4);
+const PLAYER_BASE_TARGET = new THREE.Vector3(0, 0, -MAP_WIDTH / 3);
+const ENEMY_BASE_TARGET = new THREE.Vector3(0, 0, MAP_WIDTH / 3);
 const ENEMY_BASE_MAX_HEALTH = 100;
 let enemyBaseHealth = ENEMY_BASE_MAX_HEALTH;
 const ATTACK_RADIUS = 2; // How close units get to the base
@@ -629,18 +629,37 @@ function init() {
     directionalLight.position.set(10, 20, 10);
     scene.add(directionalLight);
 
-    const planeGeometry = new THREE.PlaneGeometry(MAP_WIDTH, MAP_WIDTH / 2);
-    const playerPlaneMaterial = new THREE.MeshLambertMaterial({ color: 0x228b22, side: THREE.DoubleSide });
-    const enemyPlaneMaterial = new THREE.MeshLambertMaterial({ color: 0x8b0000, side: THREE.DoubleSide });
+    const planeWidth = MAP_WIDTH;
+    const zoneDepth = MAP_WIDTH / 3;
     
-    const playerPlane = new THREE.Mesh(planeGeometry, playerPlaneMaterial);
+    // Синя зона гравця (ліва частина)
+    const playerPlaneMaterial = new THREE.MeshLambertMaterial({ color: 0x1e90ff, side: THREE.DoubleSide });
+    const playerPlane = new THREE.Mesh(
+        new THREE.PlaneGeometry(planeWidth, zoneDepth),
+        playerPlaneMaterial
+    );
     playerPlane.rotation.x = Math.PI / 2;
-    playerPlane.position.z = -MAP_WIDTH / 4;
+    playerPlane.position.z = -MAP_WIDTH / 3; // Ліва частина
     scene.add(playerPlane);
+    
+    // Зелена нейтральна зона (центр)
+    const neutralPlaneMaterial = new THREE.MeshLambertMaterial({ color: 0x00aa00, side: THREE.DoubleSide });
+    const neutralPlane = new THREE.Mesh(
+        new THREE.PlaneGeometry(planeWidth, zoneDepth),
+        neutralPlaneMaterial
+    );
+    neutralPlane.rotation.x = Math.PI / 2;
+    neutralPlane.position.z = 0; // Центр
+    scene.add(neutralPlane);
 
-    const enemyPlane = new THREE.Mesh(planeGeometry, enemyPlaneMaterial);
+    // Червона зона ворога (права частина)
+    const enemyPlaneMaterial = new THREE.MeshLambertMaterial({ color: 0xaa0000, side: THREE.DoubleSide });
+    const enemyPlane = new THREE.Mesh(
+        new THREE.PlaneGeometry(planeWidth, zoneDepth),
+        enemyPlaneMaterial
+    );
     enemyPlane.rotation.x = Math.PI / 2;
-    enemyPlane.position.z = MAP_WIDTH / 4;
+    enemyPlane.position.z = MAP_WIDTH / 3; // Права частина
     scene.add(enemyPlane);
 
     const gridHelper = new THREE.GridHelper(MAP_WIDTH, MAP_WIDTH, 0xaaaaaa, 0xaaaaaa);
@@ -655,7 +674,7 @@ function init() {
     scene.add(enemyGate);
 
     worker = workerModel.clone();
-    worker.position.set(0, 0, -MAP_WIDTH / 4);
+    worker.position.set(0, 0, -MAP_WIDTH / 3); // Переміщуємо робочого на синю зону
     scene.add(worker);
 
     const raycaster = new THREE.Raycaster();
