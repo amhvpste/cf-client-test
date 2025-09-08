@@ -33,16 +33,16 @@ const loader = new GLTFLoader();
 
 // Початок області видимості глобальних функцій
 function updateGoldDisplay() {
-    document.getElementById('gold-display').innerText = `Золото: ${gold}`;
+    document.getElementById('gold-display').innerText = `gold: ${gold}`;
     checkButtonAvailability();
 }
 
 function updateUnitCount() {
-    document.getElementById('unit-count').innerText = `Юніти на карті: ${units.length}`;
+    document.getElementById('unit-count').innerText = `units on map: ${units.length}`;
 }
 
 function updateEnemyBaseUnits() {
-    document.getElementById('enemy-base-units').innerText = `Юнітів на базі ворога: ${unitsAtEnemyBase} / ${WIN_CONDITION_UNITS}`;
+    document.getElementById('enemy-base-units').innerText = `unit for enemy base : ${unitsAtEnemyBase} / ${WIN_CONDITION_UNITS}`;
 }
 
 function checkButtonAvailability() {
