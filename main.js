@@ -1,12 +1,15 @@
-import * as THREE from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+// Use a specific version of Three.js with GLTFLoader
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.module.js';
+import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.152.2/examples/jsm/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'https://cdn.jsdelivr.net/npm/three@0.152.2/examples/jsm/loaders/DRACOLoader.js';
 
 let scene, camera, renderer, plane;
 let worker;
+let decorativeObjects = [];
 let targetPosition = null;
 let gameWon = false;
 
-let workerModel, unitModel, castleModel, towerModel, gateModel;
+let workerModel, unitModel, castleModel, towerModel, gateModel, wallModel;
 let currentBuildingModel;
 const cameraOffset = new THREE.Vector3(0, 5, -5);
 
@@ -146,7 +149,214 @@ function checkWinCondition() {
 }
 
 function restartGame() {
+    // Remove all decorative objects
+    decorativeObjects.forEach(obj => {
+        scene.remove(obj);
+    });
+    decorativeObjects = [];
+    
+    // Reload the page
     window.location.reload();
+}
+
+// Add these variables at the top with other global variables
+let decorativeModels = {
+    groundHills: null,
+    rocksLarge: null,
+    treeLarge: null,
+    treeLog: null
+};
+
+function loadDecorativeModels() {
+    try {
+        const modelLoader = new GLTFLoader();
+        modelLoader.setPath('assets/models/');
+        
+        // Configure texture loading
+        modelLoader.manager.onStart = function (url, itemsLoaded, itemsTotal) {
+            console.log('Loading model: ' + url);
+        };
+        
+        modelLoader.manager.onError = function (url) {
+            console.error('Error loading model: ' + url);
+        };
+        
+        // Configure DRACO loader for compressed models
+        const dracoLoader = new DRACOLoader();
+        dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
+        modelLoader.setDRACOLoader(dracoLoader);
+        
+        // Function to handle model loading
+        const onLoad = (gltf, modelType) => {
+            try {
+                const model = gltf.scene;
+                
+                // Update color management for the model
+                model.traverse((child) => {
+                    if (child.isMesh && child.material) {
+                        const materials = Array.isArray(child.material) ? child.material : [child.material];
+                        materials.forEach(mat => {
+                            if (mat.map) {
+                                mat.map.colorSpace = THREE.SRGBColorSpace;
+                                mat.needsUpdate = true;
+                            }
+                            if (mat.emissiveMap) mat.emissiveMap.colorSpace = THREE.SRGBColorSpace;
+                            if (mat.aoMap) mat.aoMap.colorSpace = THREE.SRGBColorSpace;
+                            if (mat.normalMap) mat.normalMap.colorSpace = THREE.NoColorSpace;
+                        });
+                    }
+                });
+                // Assign to the correct property in decorativeModels
+                switch(modelType) {
+                    case 'groundHills': decorativeModels.groundHills = model; break;
+                    case 'rocksLarge': decorativeModels.rocksLarge = model; break;
+                    case 'treeLarge': decorativeModels.treeLarge = model; break;
+                    case 'treeLog': decorativeModels.treeLog = model; break;
+                }
+                createMapDecorations();
+            } catch (error) {
+                console.error(`Error processing ${modelType}:`, error);
+            }
+        };
+    
+        // Load ground hills
+        modelLoader.load('ground-hills.glb', (gltf) => {
+            onLoad(gltf, 'groundHills');
+        }, undefined, (error) => {
+            console.error('Error loading ground-hills.glb:', error);
+        });
+        
+        // Load large rocks
+        modelLoader.load('rocks-large.glb', (gltf) => {
+            onLoad(gltf, 'rocksLarge');
+        }, undefined, (error) => {
+            console.error('Error loading rocks-large.glb:', error);
+        });
+        
+        // Load large trees
+        modelLoader.load('tree-large.glb', (gltf) => {
+            onLoad(gltf, 'treeLarge');
+        }, undefined, (error) => {
+            console.error('Error loading tree-large.glb:', error);
+        });
+        
+        // Load tree logs
+        modelLoader.load('tree-log.glb', (gltf) => {
+            onLoad(gltf, 'treeLog');
+        }, undefined, (error) => {
+            console.error('Error loading tree-log.glb:', error);
+        });
+    } catch (error) {
+        console.error('Error in loadDecorativeModels:', error);
+    }
+}
+
+function createMapDecorations() {
+    // Only proceed if all models are loaded
+    if (!decorativeModels.groundHills || !decorativeModels.rocksLarge || 
+        !decorativeModels.treeLarge || !decorativeModels.treeLog) {
+        return;
+    }
+    
+    // Clear any existing decorative objects
+    decorativeObjects.forEach(obj => {
+        scene.remove(obj);
+    });
+    decorativeObjects = [];
+    
+    // Define map boundaries (adjust these based on your map size)
+    const mapWidth = MAP_WIDTH * 0.8;  // 80% of map width
+    const mapDepth = MAP_WIDTH * 0.4;  // 40% of map depth (since map is split in half)
+    const startZ = -MAP_WIDTH * 0.4;   // Start Z position (player side)
+    
+    // Add ground hills (fewer, larger elements)
+    for (let i = 0; i < 5; i++) {
+        const hill = decorativeModels.groundHills.clone();
+        const scale = 0.5 + Math.random() * 0.5; // Random scale between 0.5 and 1.0
+        
+        hill.scale.set(scale, scale, scale);
+        
+        // Position randomly on the map
+        const x = (Math.random() - 0.5) * mapWidth;
+        const z = startZ + Math.random() * mapDepth;
+        
+        // Position on the ground (y = 0)
+        hill.position.set(x, 0, z);
+        
+        // Random rotation
+        hill.rotation.y = Math.random() * Math.PI * 2;
+        
+        scene.add(hill);
+        decorativeObjects.push(hill);
+    }
+    
+    // Add large rocks (more elements)
+    for (let i = 0; i < 15; i++) {
+        const rock = decorativeModels.rocksLarge.clone();
+        const scale = 0.3 + Math.random() * 0.4; // Random scale between 0.3 and 0.7
+        
+        rock.scale.set(scale, scale, scale);
+        
+        // Position randomly on the map
+        const x = (Math.random() - 0.5) * mapWidth;
+        const z = startZ + Math.random() * mapDepth;
+        
+        // Position on the ground (y = 0)
+        rock.position.set(x, 0, z);
+        
+        // Random rotation
+        rock.rotation.y = Math.random() * Math.PI * 2;
+        
+        scene.add(rock);
+        decorativeObjects.push(rock);
+    }
+    
+    // Add large trees (medium number of elements)
+    for (let i = 0; i < 10; i++) {
+        const tree = decorativeModels.treeLarge.clone();
+        const scale = 0.8 + Math.random() * 0.4; // Random scale between 0.8 and 1.2
+        
+        tree.scale.set(scale, scale, scale);
+        
+        // Position randomly on the map, but avoid the center path
+        let x, z;
+        do {
+            x = (Math.random() - 0.5) * mapWidth;
+            z = startZ + Math.random() * mapDepth;
+        } while (Math.abs(x) < 2); // Keep trees away from the center path
+        
+        // Position on the ground (y = 0)
+        tree.position.set(x, 0, z);
+        
+        // Random rotation
+        tree.rotation.y = Math.random() * Math.PI * 2;
+        
+        scene.add(tree);
+        decorativeObjects.push(tree);
+    }
+    
+    // Add tree logs (more elements)
+    for (let i = 0; i < 20; i++) {
+        const log = decorativeModels.treeLog.clone();
+        const scale = 0.5 + Math.random() * 0.5; // Random scale between 0.5 and 1.0
+        
+        log.scale.set(scale, scale, scale);
+        
+        // Position randomly on the map
+        const x = (Math.random() - 0.5) * mapWidth;
+        const z = startZ + Math.random() * mapDepth;
+        
+        // Position on the ground (y = 0)
+        log.position.set(x, 0, z);
+        
+        // Random rotation
+        log.rotation.y = Math.random() * Math.PI * 2;
+        
+        scene.add(log);
+        decorativeObjects.push(log);
+    }
+    
+    console.log('Map decorations created');
 }
 // Кінець області видимості глобальних функцій
 
@@ -159,10 +369,15 @@ function createModelViewer(model, containerId, size = 1, rotation = { x: 0, y: 0
     const renderer = new THREE.WebGLRenderer({ 
         alpha: true, 
         antialias: true,
+        powerPreference: 'high-performance',
         preserveDrawingBuffer: true
     });
-    renderer.setSize(width, height);
+    renderer.setSize(container.clientWidth, container.clientHeight);
     renderer.setClearColor(0x000000, 0);
+    renderer.outputEncoding = THREE.sRGBEncoding;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.0;
     container.innerHTML = '';
     container.appendChild(renderer.domElement);
     
@@ -395,10 +610,18 @@ function init() {
     camera.position.set(0, 15, -20);
     camera.lookAt(0, 0, 0);
 
-    renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer = new THREE.WebGLRenderer({ 
+        antialias: true,
+        powerPreference: 'high-performance',
+        alpha: true
+    });
     renderer.setSize(window.innerWidth, window.innerHeight);
-    document.body.appendChild(renderer.domElement);
     renderer.setClearColor(0x87ceeb);
+    // Use the new color management API
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.0;
+    document.body.appendChild(renderer.domElement);
 
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
     scene.add(ambientLight);
@@ -484,16 +707,28 @@ function init() {
         }
     }, 5000);
 
-    // Initialize model viewers after models are loaded
+    // Initialize model viewers after models are loaded (only if containers exist)
     setTimeout(() => {
-        if (wallModel) createModelViewer(wallModel, 'gold-model', 1.5, { x: 0, y: 0, z: 0 });
-        if (workerModel) createModelViewer(workerModel, 'unit-model', 1.5, { x: 0, y: 0, z: 0 });
-        if (gateModel) createModelViewer(gateModel, 'back-model', 1, { x: 0, y: Math.PI/4, z: 0 });
+        const unitModelContainer = document.getElementById('unit-model');
+        const backModelContainer = document.getElementById('back-model');
+        
+        if (workerModel && unitModelContainer) {
+            createModelViewer(workerModel, 'unit-model', 1.5, { x: 0, y: 0, z: 0 });
+        }
+        if (gateModel && backModelContainer) {
+            createModelViewer(gateModel, 'back-model', 1, { x: 0, y: Math.PI/4, z: 0 });
+        }
     }, 500);
+    
+    // Load decorative models
+    loadDecorativeModels();
     
     updateGoldDisplay();
     updateUnitCount();
     updateEnemyBaseHealth();
+    
+    // Create decorative elements
+    createMapDecorations();
 
     window.addEventListener('click', onMouseClick, false);
     window.addEventListener('resize', onWindowResize, false);
