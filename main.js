@@ -46,10 +46,11 @@ const buildingUnitTypes = {
 };
 
 const buildings = [];
+const enemyBuildings = [];
 const units = [];
 const enemyUnits = [];
 let lastEnemySpawnTime = 0;
-const ENEMY_SPAWN_COOLDOWN = 10000; // 10 seconds
+const ENEMY_SPAWN_COOLDOWN = 5000; // 5 seconds
 
 const MAP_WIDTH = 20;
 const PLAYER_SIDE_Z_MAX = 0;
@@ -140,7 +141,6 @@ function spawnUnit(building) {
         
         scene.add(newUnit);
         units.push(newUnit);
-        updateUnitCount();
         
         console.log(`Successfully spawned ${unitType} at`, newUnit.position);
     } catch (error) {
@@ -162,15 +162,29 @@ function checkWinCondition() {
 }
 
 function spawnEnemyUnit() {
-    if (!enemyUnits.length || Math.random() < 0.3) { // 30% chance to spawn a ram, 70% for ballista
-        const unitType = Math.random() < 0.5 ? UNIT_TYPES.RAM : UNIT_TYPES.BALLISTA;
+    // Don't spawn if no barracks exist yet
+    if (enemyBuildings.length === 0) return;
+    
+    // Randomly select a barrack
+    const barrack = enemyBuildings[Math.floor(Math.random() * enemyBuildings.length)];
+    
+    // Check if it's time to spawn a new unit from this barrack
+    const currentTime = Date.now();
+    if (currentTime - barrack.lastSpawnTime > barrack.spawnCooldown) {
+        const unitType = barrack.unitType;
         const unitProps = UNIT_PROPERTIES[unitType];
         
         if (!unitProps || !unitProps.modelInstance) return;
         
         const newUnit = unitProps.modelInstance.clone();
-        const spawnX = (Math.random() - 0.5) * 10; // Random x position near the enemy base
-        newUnit.position.set(spawnX, 0, MAP_WIDTH / 3);
+        // Spawn near the barrack
+        const spawnOffset = new THREE.Vector3(
+            (Math.random() - 0.5) * 2,
+            0,
+            (Math.random() - 0.5) * 2
+        ).normalize().multiplyScalar(2);
+        
+        newUnit.position.copy(barrack.object.position).add(spawnOffset);
         newUnit.unitType = unitType;
         newUnit.speed = unitProps.speed * 0.8; // Slightly slower than player units
         newUnit.damage = unitProps.damage;
@@ -179,8 +193,12 @@ function spawnEnemyUnit() {
         newUnit.attackCooldown = 0;
         newUnit.attackPosition = null;
         
+        // Rotate unit to face the target
+        newUnit.lookAt(newUnit.target);
+        
         scene.add(newUnit);
         enemyUnits.push(newUnit);
+        barrack.lastSpawnTime = currentTime;
     }
 }
 
@@ -241,6 +259,86 @@ function updateEnemyUnits(delta) {
     }
 }
 
+function createEnemyBarracks() {
+    console.log('Creating enemy barracks...');
+    
+    // Create first barrack after 2 seconds
+    setTimeout(() => {
+        if (gameWon || !towerModel) {
+            console.log('Game won or tower model not loaded, skipping barrack creation');
+            return;
+        }
+        
+        // Random position on enemy side (z > 0)
+        const x = (Math.random() - 0.5) * (MAP_WIDTH * 0.8);
+        const z = MAP_WIDTH / 6 + Math.random() * (MAP_WIDTH / 3);
+        
+        console.log(`Creating first enemy barrack at (${x}, 0, ${z})`);
+        
+        try {
+            const barrack = {
+                object: towerModel.clone(),
+                type: 'tower',
+                lastSpawnTime: 0,
+                spawnCooldown: TOWER_UNIT_COOLDOWN * 1.5, // Slower than player's towers
+                unitType: UNIT_TYPES.RAM // Enemy barracks spawn RAM units
+            };
+            
+            // Position and scale the barrack
+            barrack.object.position.set(x, 0, z);
+            barrack.object.rotation.y = Math.PI; // Face towards player base
+            
+            // Add to scene and array
+            scene.add(barrack.object);
+            enemyBuildings.push(barrack);
+            
+            console.log('First enemy barrack created successfully');
+            
+        } catch (error) {
+            console.error('Error creating first enemy barrack:', error);
+        }
+        
+    }, 2000); // First barrack after 2 seconds
+    
+    // Create second barrack after 5 seconds
+    setTimeout(() => {
+        if (gameWon || !towerModel) {
+            console.log('Game won or tower model not loaded, skipping second barrack creation');
+            return;
+        }
+        
+        // Random position on enemy side (z > 0)
+        const x = (Math.random() - 0.5) * (MAP_WIDTH * 0.8);
+        const z = MAP_WIDTH / 6 + Math.random() * (MAP_WIDTH / 3);
+        
+        console.log(`Creating second enemy barrack at (${x}, 0, ${z})`);
+        
+        try {
+            const barrack = {
+                object: towerModel.clone(),
+                type: 'tower',
+                lastSpawnTime: 0,
+                spawnCooldown: TOWER_UNIT_COOLDOWN * 1.5, // Slower than player's towers
+                unitType: UNIT_TYPES.BALLISTA // Second barrack spawns BALLISTA units
+            };
+            
+            // Position and scale the barrack
+            barrack.object.position.set(x, 0, z);
+            barrack.object.rotation.y = Math.PI; // Face towards player base
+            
+            // Add to scene and array
+            scene.add(barrack.object);
+            enemyBuildings.push(barrack);
+            
+            console.log('Second enemy barrack created successfully');
+            
+        } catch (error) {
+            console.error('Error creating second enemy barrack:', error);
+        }
+        
+    }, 5000); // Second barrack after 5 seconds
+}
+
 function restartGame() {
     // Reset game state
     enemyBaseHealth = BASE_MAX_HEALTH;
@@ -254,7 +352,12 @@ function restartGame() {
     units.length = 0;
     buildings.length = 0;
     enemyUnits.length = 0;
-    updateUnitCount();
+    
+    // Remove enemy buildings from scene
+    enemyBuildings.forEach(barrack => {
+        scene.remove(barrack.object);
+    });
+    enemyBuildings.length = 0;
     
     // Hide win screen
     document.getElementById('win-screen').style.display = 'none';
@@ -262,6 +365,9 @@ function restartGame() {
     
     // Reset spawn timers
     lastEnemySpawnTime = 0;
+    
+    // Create enemy barracks
+    createEnemyBarracks();
 }
 
 // Add these variables at the top with other global variables
@@ -649,8 +755,18 @@ function loadModels() {
         );
         
         loader.load('assets/models/tower-square-roof.glb', 
-            (gltf) => handleLoad(gltf, 'tower'), 
-            undefined, 
+            (gltf) => {
+                console.log('Successfully loaded tower model');
+                handleLoad(gltf, 'tower');
+                // Log the model properties
+                const model = gltf.scene;
+                console.log('Tower model scale:', model.scale);
+                console.log('Tower model position:', model.position);
+                console.log('Tower model rotation:', model.rotation);
+            }, 
+            (xhr) => {
+                console.log('Loading tower model: ' + (xhr.loaded / xhr.total * 100) + '% loaded');
+            },
             (error) => {
                 console.error('Error loading tower-square-roof.glb:', error);
                 loadedCount++;
@@ -824,6 +940,9 @@ function init() {
     
     // Create decorative elements
     createMapDecorations();
+    
+    // Create enemy barracks
+    createEnemyBarracks();
 
     window.addEventListener('click', onMouseClick, false);
     window.addEventListener('resize', onWindowResize, false);
