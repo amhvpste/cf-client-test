@@ -273,7 +273,7 @@ function loadModels() {
         };
 
         // Load worker model
-        loader.load('worker2.glb', 
+        loader.load('assets/models/worker2.glb', 
             (gltf) => handleLoad(gltf, 'worker'), 
             undefined, 
             (error) => {
@@ -284,7 +284,7 @@ function loadModels() {
         );
         
         // Load siege ram model
-        loader.load('models/GLB format/siege-ram.glb', 
+        loader.load('assets/models/siege-ram.glb', 
             (gltf) => {
                 try {
                     const model = gltf.scene;
@@ -315,7 +315,7 @@ function loadModels() {
         );
         
         // Load siege ballista model
-        loader.load('models/GLB format/siege-ballista.glb', 
+        loader.load('assets/models/siege-ballista.glb', 
             (gltf) => {
                 try {
                     const model = gltf.scene;
@@ -346,7 +346,7 @@ function loadModels() {
         );
         
                 // Load other models
-        loader.load('castle_fort_01.glb', 
+        loader.load('assets/models/castle_fort_01.glb', 
             (gltf) => handleLoad(gltf, 'castle'), 
             undefined, 
             (error) => {
@@ -357,7 +357,7 @@ function loadModels() {
             }
         );
         
-        loader.load('tower1.glb', 
+        loader.load('assets/models/tower1.glb', 
             (gltf) => handleLoad(gltf, 'tower'), 
             undefined, 
             (error) => {
@@ -367,7 +367,7 @@ function loadModels() {
             }
         );
         
-        loader.load('castle_gate_01.glb', 
+        loader.load('assets/models/castle_gate_01.glb', 
             (gltf) => handleLoad(gltf, 'gate'), 
             undefined, 
             (error) => {
@@ -377,7 +377,7 @@ function loadModels() {
             }
         );
         
-        loader.load('wall_01.glb', 
+        loader.load('assets/models/wall_01.glb', 
             (gltf) => handleLoad(gltf, 'wall'), 
             undefined, 
             (error) => {
