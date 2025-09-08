@@ -202,6 +202,11 @@ function init() {
     document.getElementById('build-castle').addEventListener('click', () => selectBuilding('castle'));
     document.getElementById('build-tower').addEventListener('click', () => selectBuilding('tower'));
     document.getElementById('restart-button').addEventListener('click', restartGame);
+    document.getElementById('back-button').addEventListener('click', () => {
+        if (confirm('Are you sure you want to go back to the main menu? Your progress will be lost.')) {
+            window.history.back();
+        }
+    });
 
     currentBuildingModel = castleModel;
 
