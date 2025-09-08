@@ -264,26 +264,24 @@ function createMapDecorations() {
     });
     decorativeObjects = [];
     
-    // Define map boundaries (adjust these based on your map size)
+    // Define green zone boundaries (neutral zone in the middle)
     const mapWidth = MAP_WIDTH * 0.8;  // 80% of map width
-    const mapDepth = MAP_WIDTH * 0.4;  // 40% of map depth (since map is split in half)
-    const startZ = -MAP_WIDTH * 0.4;   // Start Z position (player side)
+    const zoneWidth = MAP_WIDTH / 3;   // Width of each zone
+    const neutralZoneZStart = -zoneWidth / 2;  // Start of green zone (Z axis)
+    const neutralZoneZEnd = zoneWidth / 2;     // End of green zone (Z axis)
     
     // Add ground hills (fewer, larger elements)
     for (let i = 0; i < 5; i++) {
         const hill = decorativeModels.groundHills.clone();
-        const scale = 0.5 + Math.random() * 0.5; // Random scale between 0.5 and 1.0
+        const scale = 0.5 + Math.random() * 0.5;
         
         hill.scale.set(scale, scale, scale);
         
-        // Position randomly on the map
+        // Position randomly in the green zone
         const x = (Math.random() - 0.5) * mapWidth;
-        const z = startZ + Math.random() * mapDepth;
+        const z = neutralZoneZStart + Math.random() * (neutralZoneZEnd - neutralZoneZStart);
         
-        // Position on the ground (y = 0)
         hill.position.set(x, 0, z);
-        
-        // Random rotation
         hill.rotation.y = Math.random() * Math.PI * 2;
         
         scene.add(hill);
@@ -293,18 +291,15 @@ function createMapDecorations() {
     // Add large rocks (more elements)
     for (let i = 0; i < 15; i++) {
         const rock = decorativeModels.rocksLarge.clone();
-        const scale = 0.3 + Math.random() * 0.4; // Random scale between 0.3 and 0.7
+        const scale = 0.3 + Math.random() * 0.4;
         
         rock.scale.set(scale, scale, scale);
         
-        // Position randomly on the map
+        // Position randomly in the green zone
         const x = (Math.random() - 0.5) * mapWidth;
-        const z = startZ + Math.random() * mapDepth;
+        const z = neutralZoneZStart + Math.random() * (neutralZoneZEnd - neutralZoneZStart);
         
-        // Position on the ground (y = 0)
         rock.position.set(x, 0, z);
-        
-        // Random rotation
         rock.rotation.y = Math.random() * Math.PI * 2;
         
         scene.add(rock);
@@ -314,49 +309,25 @@ function createMapDecorations() {
     // Add large trees (medium number of elements)
     for (let i = 0; i < 10; i++) {
         const tree = decorativeModels.treeLarge.clone();
-        const scale = 0.8 + Math.random() * 0.4; // Random scale between 0.8 and 1.2
+        const scale = 0.8 + Math.random() * 0.4;
         
         tree.scale.set(scale, scale, scale);
         
-        // Position randomly on the map, but avoid the center path
+        // Position randomly in the green zone, but avoid the center path
         let x, z;
         do {
             x = (Math.random() - 0.5) * mapWidth;
-            z = startZ + Math.random() * mapDepth;
+            z = neutralZoneZStart + Math.random() * (neutralZoneZEnd - neutralZoneZStart);
         } while (Math.abs(x) < 2); // Keep trees away from the center path
         
-        // Position on the ground (y = 0)
         tree.position.set(x, 0, z);
-        
-        // Random rotation
         tree.rotation.y = Math.random() * Math.PI * 2;
         
         scene.add(tree);
         decorativeObjects.push(tree);
     }
     
-    // Add tree logs (more elements)
-    for (let i = 0; i < 20; i++) {
-        const log = decorativeModels.treeLog.clone();
-        const scale = 0.5 + Math.random() * 0.5; // Random scale between 0.5 and 1.0
-        
-        log.scale.set(scale, scale, scale);
-        
-        // Position randomly on the map
-        const x = (Math.random() - 0.5) * mapWidth;
-        const z = startZ + Math.random() * mapDepth;
-        
-        // Position on the ground (y = 0)
-        log.position.set(x, 0, z);
-        
-        // Random rotation
-        log.rotation.y = Math.random() * Math.PI * 2;
-        
-        scene.add(log);
-        decorativeObjects.push(log);
-    }
-    
-    console.log('Map decorations created');
+    console.log('Map decorations created in the green zone');
 }
 // Кінець області видимості глобальних функцій
 
