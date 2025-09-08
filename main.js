@@ -106,10 +106,92 @@ function restartGame() {
 // Кінець області видимості глобальних функцій
 
 
+function createModelViewer(model, containerId, size = 1, rotation = { x: 0, y: 0, z: 0 }) {
+    const container = document.getElementById(containerId);
+    const width = container.clientWidth;
+    const height = container.clientHeight;
+    
+    const renderer = new THREE.WebGLRenderer({ 
+        alpha: true, 
+        antialias: true,
+        preserveDrawingBuffer: true
+    });
+    renderer.setSize(width, height);
+    renderer.setClearColor(0x000000, 0);
+    container.innerHTML = '';
+    container.appendChild(renderer.domElement);
+    
+    const scene = new THREE.Scene();
+    scene.background = null;
+    
+    // Use OrthographicCamera for UI elements
+    const aspect = width / height;
+    const camera = new THREE.OrthographicCamera(
+        -aspect, aspect, 1, -1, 0.1, 1000
+    );
+    camera.position.z = 5;
+    camera.lookAt(0, 0, 0);
+    
+    // Add better lighting
+    const ambientLight = new THREE.AmbientLight(0xffffff, 1);
+    scene.add(ambientLight);
+    
+    const directionalLight1 = new THREE.DirectionalLight(0xffffff, 1);
+    directionalLight1.position.set(1, 1, 1);
+    scene.add(directionalLight1);
+    
+    const directionalLight2 = new THREE.DirectionalLight(0xffffff, 0.5);
+    directionalLight2.position.set(-1, -1, -1);
+    scene.add(directionalLight2);
+    
+    const modelInstance = model.clone();
+    scene.add(modelInstance);
+    
+    // Center and scale the model
+    const box = new THREE.Box3().setFromObject(modelInstance);
+    const center = box.getCenter(new THREE.Vector3());
+    const modelSize = box.getSize(new THREE.Vector3());
+    const maxDim = Math.max(modelSize.x, modelSize.y, modelSize.z);
+    const scale = 1.5 / maxDim;
+    
+    modelInstance.position.set(-center.x * scale, -center.y * scale, -center.z * scale);
+    modelInstance.scale.set(scale, scale, scale);
+    modelInstance.rotation.set(rotation.x, rotation.y, rotation.z);
+    
+    // Add a small rotation animation
+    function animate() {
+        requestAnimationFrame(animate);
+        modelInstance.rotation.y += 0.01;
+        renderer.render(scene, camera);
+    }
+    
+    animate();
+    
+    return {
+        updateModel: (newModel) => {
+            scene.remove(modelInstance);
+            const newInstance = newModel.clone();
+            scene.add(newInstance);
+            
+            const newBox = new THREE.Box3().setFromObject(newInstance);
+            const newCenter = newBox.getCenter(new THREE.Vector3());
+            const newModelSize = newBox.getSize(new THREE.Vector3());
+            const newMaxDim = Math.max(newModelSize.x, newModelSize.y, newModelSize.z);
+            const newScale = 1.5 / newMaxDim;
+            
+            newInstance.position.set(-newCenter.x * newScale, -newCenter.y * newScale, -newCenter.z * newScale);
+            newInstance.scale.set(newScale, newScale, newScale);
+            newInstance.rotation.set(rotation.x, rotation.y, rotation.z);
+            
+            modelInstance = newInstance;
+        }
+    };
+}
+
 function loadModels() {
     return new Promise((resolve) => {
         let loadedCount = 0;
-        const totalModels = 5;
+        const totalModels = 6;
 
         const handleLoad = (gltf, modelType) => {
             console.log(`Модель '${modelType}' успішно завантажена.`);
@@ -147,6 +229,7 @@ function loadModels() {
         loader.load('castle_fort_01.glb', (gltf) => handleLoad(gltf, 'castle'), undefined, (error) => console.error('Помилка завантаження castle_fort_01.glb', error));
         loader.load('tower1.glb', (gltf) => handleLoad(gltf, 'tower'), undefined, (error) => console.error('Помилка завантаження tower1.glb', error));
         loader.load('castle_gate_01.glb', (gltf) => handleLoad(gltf, 'gate'), undefined, (error) => console.error('Помилка завантаження castle_gate_01.glb', error));
+        loader.load('wall_01.glb', (gltf) => handleLoad(gltf, 'wall'), undefined, (error) => console.error('Помилка завантаження wall_01.glb', error));
     });
 }
 
@@ -250,6 +333,13 @@ function init() {
         }
     }, 5000);
 
+    // Initialize model viewers after models are loaded
+    setTimeout(() => {
+        if (wallModel) createModelViewer(wallModel, 'gold-model', 1.5, { x: 0, y: 0, z: 0 });
+        if (workerModel) createModelViewer(workerModel, 'unit-model', 1.5, { x: 0, y: 0, z: 0 });
+        if (gateModel) createModelViewer(gateModel, 'back-model', 1, { x: 0, y: Math.PI/4, z: 0 });
+    }, 500);
+    
     updateGoldDisplay();
     updateUnitCount();
     updateEnemyBaseHealth();
