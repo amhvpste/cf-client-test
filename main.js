@@ -1,13 +1,15 @@
-// Import Three.js and its modules from a single source
-import * as THREE from 'https://unpkg.com/three@0.152.2/build/three.module.js';
-import { GLTFLoader } from 'https://unpkg.com/three@0.152.2/examples/jsm/loaders/GLTFLoader.js';
-import { DRACOLoader } from 'https://unpkg.com/three@0.152.2/examples/jsm/loaders/DRACOLoader.js';
+// Import Three.js and its modules via importmap (see index.html)
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 
 let scene, camera, renderer, plane;
 let worker;
 let decorativeObjects = [];
 let targetPosition = null;
 let gameWon = false;
+let enemyBarracksTimeouts = [];
+let goldIntervalId = null;
 
 let workerModel, unitModel, castleModel, towerModel, gateModel, wallModel;
 let currentBuildingModel;
@@ -152,10 +154,16 @@ function checkWinCondition() {
     if (enemyBaseHealth <= 0) {
         document.getElementById('win-screen').querySelector('p').textContent = 'You Win!';
         document.getElementById('win-screen').style.display = 'flex';
+        gameWon = true;
+        clearEnemyBarracksTimers();
+        clearGoldTimer();
         return true;
     } else if (playerBaseHealth <= 0) {
         document.getElementById('win-screen').querySelector('p').textContent = 'Game Over!';
         document.getElementById('win-screen').style.display = 'flex';
+        gameWon = true;
+        clearEnemyBarracksTimers();
+        clearGoldTimer();
         return true;
     }
     return false;
@@ -263,7 +271,7 @@ function createEnemyBarracks() {
     console.log('Creating enemy barracks...');
     
     // Create first barrack after 2 seconds
-    setTimeout(() => {
+    const firstTimeout = setTimeout(() => {
         if (gameWon || !towerModel) {
             console.log('Game won or tower model not loaded, skipping barrack creation');
             return;
@@ -299,9 +307,10 @@ function createEnemyBarracks() {
         }
         
     }, 2000); // First barrack after 2 seconds
+    enemyBarracksTimeouts.push(firstTimeout);
     
     // Create second barrack after 5 seconds
-    setTimeout(() => {
+    const secondTimeout = setTimeout(() => {
         if (gameWon || !towerModel) {
             console.log('Game won or tower model not loaded, skipping second barrack creation');
             return;
@@ -337,9 +346,47 @@ function createEnemyBarracks() {
         }
         
     }, 5000); // Second barrack after 5 seconds
+    enemyBarracksTimeouts.push(secondTimeout);
+}
+
+function clearEnemyBarracksTimers() {
+    enemyBarracksTimeouts.forEach((timeoutId) => clearTimeout(timeoutId));
+    enemyBarracksTimeouts = [];
+}
+
+function clearGoldTimer() {
+    if (goldIntervalId !== null) {
+        clearInterval(goldIntervalId);
+        goldIntervalId = null;
+    }
+}
+
+function startGoldIncomeTimer() {
+    clearGoldTimer();
+    goldIntervalId = setInterval(() => {
+        if (!gameWon) {
+            gold += 25;
+            updateGoldDisplay();
+        }
+    }, 5000);
+}
+
+function removeUnitsAndBuildings() {
+    units.forEach((unit) => scene.remove(unit));
+    enemyUnits.forEach((unit) => scene.remove(unit));
+    buildings.forEach((building) => scene.remove(building.object));
+    enemyBuildings.forEach((barrack) => scene.remove(barrack.object));
+
+    units.length = 0;
+    enemyUnits.length = 0;
+    buildings.length = 0;
+    enemyBuildings.length = 0;
 }
 
 function restartGame() {
+    clearEnemyBarracksTimers();
+    clearGoldTimer();
+
     // Reset game state
     enemyBaseHealth = BASE_MAX_HEALTH;
     playerBaseHealth = BASE_MAX_HEALTH;
@@ -348,16 +395,8 @@ function restartGame() {
     gold = 1000;
     updateGoldDisplay();
     
-    // Clear existing units and buildings
-    units.length = 0;
-    buildings.length = 0;
-    enemyUnits.length = 0;
-    
-    // Remove enemy buildings from scene
-    enemyBuildings.forEach(barrack => {
-        scene.remove(barrack.object);
-    });
-    enemyBuildings.length = 0;
+    // Clear existing units and buildings from scene
+    removeUnitsAndBuildings();
     
     // Hide win screen
     document.getElementById('win-screen').style.display = 'none';
@@ -366,6 +405,9 @@ function restartGame() {
     // Reset spawn timers
     lastEnemySpawnTime = 0;
     
+    // Restart gold income
+    startGoldIncomeTimer();
+
     // Create enemy barracks
     createEnemyBarracks();
 }
@@ -911,12 +953,7 @@ function init() {
         }
     }
     
-    setInterval(() => {
-        if (!gameWon) {
-            gold += 25;
-            updateGoldDisplay();
-        }
-    }, 5000);
+    startGoldIncomeTimer();
 
     // Initialize model viewers after models are loaded (only if containers exist)
     setTimeout(() => {

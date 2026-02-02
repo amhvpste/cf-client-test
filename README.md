@@ -2,8 +2,6 @@
 
 A 3D real-time strategy game where you build castles, train units, and defeat your enemy's base. Built with Three.js and modern web technologies.
 
-![Game Screenshot](screenshot.png)  
-
 ## Game Overview
 
 Castle Fight is a strategic battle game where you must:
@@ -11,15 +9,14 @@ Castle Fight is a strategic battle game where you must:
 - Train different types of military units
 - Defend your base while attacking the enemy
 - Manage your resources (gold) wisely
-- Be the first to destroy the enemy's base!
+- Be the first to destroy the enemy's base
 
 ## Features
 
 - Build different structures (castles, towers)
 - Train various military units (Rams, Ballistas)
 - Strategic gameplay with resource management
-- Beautiful 3D graphics powered by Three.js
-- Immersive sound effects
+- 3D graphics powered by Three.js
 - Responsive design that works on most devices
 
 ## Installation
@@ -36,25 +33,17 @@ Castle Fight is a strategic battle game where you must:
    cd castle-fight
    ```
 
-2. **Install dependencies** (if using Node.js):
-   ```bash
-   npm install
-   ```
-
-3. **Run a local server**:
-   - **Option 1**: Using Node.js
+2. **Run a local server**:
+   - **Option 1**: Using Node.js (no install needed)
      ```bash
      npm start
      ```
      Then open `http://localhost:3000` in your browser.
-   
-   - **Option 2**: Using Python (if you don't have Node.js)
+
+   - **Option 2**: Using Python
      ```bash
      # Python 3
      python -m http.server
-     
-     # Python 2
-     python -m SimpleHTTPServer
      ```
      Then open `http://localhost:8000` in your browser.
 
@@ -78,17 +67,17 @@ Castle Fight is a strategic battle game where you must:
 
 ```
 castle-fight/
-├── assets/               # Game assets (models, textures, sounds)
-│   ├── icons/            # UI icons
-│   └── models/           # 3D models
-├── index.html            # Main HTML file
-├── main.js               # Main game logic
-└── README.md             # This file
+|-- assets/               # Game assets (models, textures, sounds)
+|   |-- icons/            # UI icons
+|   `-- models/           # 3D models
+|-- index.html            # Main HTML file
+|-- main.js               # Main game logic
+`-- README.md             # This file
 ```
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+Contributions are welcome. Please feel free to submit a Pull Request.
 
 1. Fork the repository
 2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
@@ -98,7 +87,7 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+No license file is currently included in this repository.
 
 ## Acknowledgments
 

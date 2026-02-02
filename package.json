@@ -1,0 +1,13 @@
+{
+  "name": "cf-client-test",
+  "version": "1.0.0",
+  "description": "A 3D real-time strategy game where you build castles, train units, and defeat your enemy's base. Built with Three.js and modern web technologies.",
+  "main": "main.js",
+  "scripts": {
+    "start": "npx http-server -c-1 -p 3000",
+    "test": "echo \"No tests specified\" && exit 0"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
