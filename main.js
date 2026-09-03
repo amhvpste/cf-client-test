@@ -10,6 +10,8 @@ let targetPosition = null;
 let gameWon = false;
 let enemyBarracksTimeouts = [];
 let goldIntervalId = null;
+let playerBaseObject = null;
+let enemyBaseObject = null;
 
 let workerModel, unitModel, castleModel, towerModel, gateModel, wallModel;
 let currentBuildingModel;
@@ -25,12 +27,14 @@ const UNIT_TYPES = {
 const UNIT_PROPERTIES = {
     [UNIT_TYPES.RAM]: {
         damage: 2,
+        maxHealth: 45,
         model: 'ram',
         modelInstance: null,  // Will be set when model loads
         speed: 0.05
     },
     [UNIT_TYPES.BALLISTA]: {
         damage: 10,
+        maxHealth: 65,
         model: 'ballista',
         modelInstance: null,  // Will be set when model loads
         speed: 0.03
@@ -59,14 +63,124 @@ const PLAYER_SIDE_Z_MAX = 0;
 const PLAYER_BASE_TARGET = new THREE.Vector3(0, 0, -MAP_WIDTH / 3);
 const ENEMY_BASE_TARGET = new THREE.Vector3(0, 0, MAP_WIDTH / 3);
 const BASE_MAX_HEALTH = 100;
+const BUILDING_MAX_HEALTH = {
+    castle: 200,
+    tower: 140
+};
 let enemyBaseHealth = BASE_MAX_HEALTH;
 let playerBaseHealth = BASE_MAX_HEALTH;
 const ATTACK_RADIUS = 2; // How close units get to the base
+const UNIT_COMBAT_RADIUS = 3;
+const UNIT_ATTACK_COOLDOWN = 1000;
 
 const CASTLE_UNIT_COOLDOWN = 5000;
 const TOWER_UNIT_COOLDOWN = 10000;
 
 const loader = new GLTFLoader();
+
+function createHealthBar(object, maxHealth, yOffset, color = '#45e06f') {
+    const canvas = document.createElement('canvas');
+    canvas.width = 128;
+    canvas.height = 20;
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+        map: texture,
+        transparent: true,
+        depthTest: false,
+        depthWrite: false
+    }));
+
+    sprite.position.set(0, yOffset, 0);
+    sprite.scale.set(2.4, 0.38, 1);
+    sprite.renderOrder = 1000;
+    object.add(sprite);
+    object.healthBar = { canvas, texture, sprite, maxHealth, color };
+    updateHealthBar(object, maxHealth);
+}
+
+function updateHealthBar(object, health) {
+    if (!object || !object.healthBar) return;
+
+    const { canvas, texture, maxHealth, color } = object.healthBar;
+    const context = canvas.getContext('2d');
+    const percent = THREE.MathUtils.clamp(health / maxHealth, 0, 1);
+
+    context.clearRect(0, 0, canvas.width, canvas.height);
+    context.fillStyle = 'rgba(15, 18, 22, 0.9)';
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.fillStyle = percent > 0.35 ? color : '#ff4141';
+    context.fillRect(4, 4, (canvas.width - 8) * percent, canvas.height - 8);
+    context.strokeStyle = '#ffffff';
+    context.lineWidth = 2;
+    context.strokeRect(1, 1, canvas.width - 2, canvas.height - 2);
+    texture.needsUpdate = true;
+}
+
+function initializeUnit(unit, unitType, team) {
+    const unitProps = UNIT_PROPERTIES[unitType];
+    unit.unitType = unitType;
+    unit.team = team;
+    unit.speed = team === 'enemy' ? unitProps.speed * 0.8 : unitProps.speed;
+    unit.damage = unitProps.damage;
+    unit.maxHealth = unitProps.maxHealth;
+    unit.health = unit.maxHealth;
+    unit.combatTarget = null;
+    unit.isAttacking = false;
+    unit.attackCooldown = 0;
+    unit.attackPosition = null;
+    createHealthBar(unit, unit.maxHealth, 2.1, team === 'player' ? '#45a7ff' : '#ff5a5a');
+}
+
+function findClosestEnemy(unit, opponents) {
+    let closest = null;
+    let closestDistance = UNIT_COMBAT_RADIUS;
+
+    for (const opponent of opponents) {
+        if (opponent.health <= 0) continue;
+        const distance = unit.position.distanceTo(opponent.position);
+        if (distance <= closestDistance) {
+            closest = opponent;
+            closestDistance = distance;
+        }
+    }
+    return closest;
+}
+
+function removeUnit(unit, collection) {
+    scene.remove(unit);
+    const index = collection.indexOf(unit);
+    if (index !== -1) collection.splice(index, 1);
+}
+
+function updateUnitCombat(unit, opponents, delta) {
+    if (unit.combatTarget &&
+        (unit.combatTarget.health <= 0 ||
+         !opponents.includes(unit.combatTarget) ||
+         unit.position.distanceTo(unit.combatTarget.position) > UNIT_COMBAT_RADIUS)) {
+        unit.combatTarget = null;
+    }
+
+    if (!unit.combatTarget) {
+        unit.combatTarget = findClosestEnemy(unit, opponents);
+    }
+    if (!unit.combatTarget) return false;
+
+    unit.lookAt(unit.combatTarget.position);
+    unit.attackCooldown -= delta * 1000;
+    if (unit.attackCooldown <= 0) {
+        const target = unit.combatTarget;
+        target.health = Math.max(0, target.health - unit.damage);
+        updateHealthBar(target, target.health);
+        unit.attackCooldown = UNIT_ATTACK_COOLDOWN;
+
+        if (target.health <= 0) {
+            removeUnit(target, opponents);
+            unit.combatTarget = null;
+        }
+    }
+    return true;
+}
 
 // Початок області видимості глобальних функцій
 function updateGoldDisplay() {
@@ -79,6 +193,7 @@ function updateEnemyBaseHealth() {
     const healthPercent = (enemyBaseHealth / BASE_MAX_HEALTH) * 100;
     healthBar.style.width = `${healthPercent}%`;
     healthBar.textContent = `${enemyBaseHealth}/${BASE_MAX_HEALTH}`;
+    updateHealthBar(enemyBaseObject, enemyBaseHealth);
 }
 
 function updatePlayerBaseHealth() {
@@ -86,6 +201,7 @@ function updatePlayerBaseHealth() {
     const healthPercent = (playerBaseHealth / BASE_MAX_HEALTH) * 100;
     healthBar.style.width = `${healthPercent}%`;
     healthBar.textContent = `${playerBaseHealth}/${BASE_MAX_HEALTH}`;
+    updateHealthBar(playerBaseObject, playerBaseHealth);
 }
 
 function checkButtonAvailability() {
@@ -133,13 +249,8 @@ function spawnUnit(building) {
     try {
         const newUnit = unitProps.modelInstance.clone();
         newUnit.position.copy(building.object.position);
-        newUnit.unitType = unitType;
-        newUnit.speed = unitProps.speed;
-        newUnit.damage = unitProps.damage;
+        initializeUnit(newUnit, unitType, 'player');
         newUnit.target = ENEMY_BASE_TARGET.clone();
-        newUnit.isAttacking = false;
-        newUnit.attackCooldown = 0;
-        newUnit.attackPosition = null;
         
         scene.add(newUnit);
         units.push(newUnit);
@@ -193,13 +304,8 @@ function spawnEnemyUnit() {
         ).normalize().multiplyScalar(2);
         
         newUnit.position.copy(barrack.object.position).add(spawnOffset);
-        newUnit.unitType = unitType;
-        newUnit.speed = unitProps.speed * 0.8; // Slightly slower than player units
-        newUnit.damage = unitProps.damage;
+        initializeUnit(newUnit, unitType, 'enemy');
         newUnit.target = PLAYER_BASE_TARGET.clone();
-        newUnit.isAttacking = false;
-        newUnit.attackCooldown = 0;
-        newUnit.attackPosition = null;
         
         // Rotate unit to face the target
         newUnit.lookAt(newUnit.target);
@@ -213,6 +319,7 @@ function spawnEnemyUnit() {
 function updateEnemyUnits(delta) {
     for (let i = enemyUnits.length - 1; i >= 0; i--) {
         const unit = enemyUnits[i];
+        if (updateUnitCombat(unit, units, delta)) continue;
         const distance = unit.position.distanceTo(unit.target);
 
         if (distance > 0.5) {
@@ -291,10 +398,13 @@ function createEnemyBarracks() {
                 spawnCooldown: TOWER_UNIT_COOLDOWN * 1.5, // Slower than player's towers
                 unitType: UNIT_TYPES.RAM // Enemy barracks spawn RAM units
             };
+            barrack.maxHealth = BUILDING_MAX_HEALTH.tower;
+            barrack.health = barrack.maxHealth;
             
             // Position and scale the barrack
             barrack.object.position.set(x, 0, z);
             barrack.object.rotation.y = Math.PI; // Face towards player base
+            createHealthBar(barrack.object, barrack.maxHealth, 3.2, '#ff5a5a');
             
             // Add to scene and array
             scene.add(barrack.object);
@@ -330,10 +440,13 @@ function createEnemyBarracks() {
                 spawnCooldown: TOWER_UNIT_COOLDOWN * 1.5, // Slower than player's towers
                 unitType: UNIT_TYPES.BALLISTA // Second barrack spawns BALLISTA units
             };
+            barrack.maxHealth = BUILDING_MAX_HEALTH.tower;
+            barrack.health = barrack.maxHealth;
             
             // Position and scale the barrack
             barrack.object.position.set(x, 0, z);
             barrack.object.rotation.y = Math.PI; // Face towards player base
+            createHealthBar(barrack.object, barrack.maxHealth, 3.2, '#ff5a5a');
             
             // Add to scene and array
             scene.add(barrack.object);
@@ -899,13 +1012,15 @@ function init() {
     const gridHelper = new THREE.GridHelper(MAP_WIDTH, MAP_WIDTH, 0xaaaaaa, 0xaaaaaa);
     scene.add(gridHelper);
 
-    const playerGate = gateModel.clone();
-    playerGate.position.copy(PLAYER_BASE_TARGET);
-    scene.add(playerGate);
+    playerBaseObject = gateModel.clone();
+    playerBaseObject.position.copy(PLAYER_BASE_TARGET);
+    createHealthBar(playerBaseObject, BASE_MAX_HEALTH, 4, '#45a7ff');
+    scene.add(playerBaseObject);
 
-    const enemyGate = gateModel.clone();
-    enemyGate.position.copy(ENEMY_BASE_TARGET);
-    scene.add(enemyGate);
+    enemyBaseObject = gateModel.clone();
+    enemyBaseObject.position.copy(ENEMY_BASE_TARGET);
+    createHealthBar(enemyBaseObject, BASE_MAX_HEALTH, 4, '#ff5a5a');
+    scene.add(enemyBaseObject);
 
     worker = workerModel.clone();
     worker.position.set(0, 0, -MAP_WIDTH / 3); // Переміщуємо робочого на синю зону
@@ -1033,8 +1148,11 @@ function animate() {
                 spawnCooldown: buildingType === 'castle' ? CASTLE_UNIT_COOLDOWN : TOWER_UNIT_COOLDOWN,
                 unitType: buildingUnitTypes[buildingType]
             };
+            building.maxHealth = BUILDING_MAX_HEALTH[buildingType];
+            building.health = building.maxHealth;
             
             building.object.position.copy(targetPosition);
+            createHealthBar(building.object, building.maxHealth, buildingType === 'castle' ? 3.8 : 3.2, '#45a7ff');
             buildings.push(building);
             scene.add(building.object);
             
@@ -1054,6 +1172,7 @@ function animate() {
 
     for (let i = units.length - 1; i >= 0; i--) {
         const unit = units[i];
+        if (updateUnitCombat(unit, enemyUnits, delta)) continue;
         
         const distance = unit.position.distanceTo(unit.target);
 
